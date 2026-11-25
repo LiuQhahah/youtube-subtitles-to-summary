@@ -78,11 +78,17 @@ can decide in two seconds whether the talk is worth reading.
 | `bgutil-ytdlp-pot-provider` server on `:4416` | PO token; without it auto-caption downloads 403 |
 
 The PO token requirement is the one people miss. Full setup in
-[`references/pitfalls.md`](references/pitfalls.md) §2.
+[`references/pitfalls.md`](skills/youtube-subtitles-to-summary/references/pitfalls.md) §2.
 
 ---
 
 ## Usage
+
+All commands below run from the skill directory — the folder containing
+`SKILL.md`. In this repo that is
+[`skills/youtube-subtitles-to-summary/`](skills/youtube-subtitles-to-summary/);
+after `npx skills add` it is wherever your agent installed the skill (for
+Claude Code, `.claude/skills/youtube-subtitles-to-summary/`).
 
 ### Check prerequisites first
 
@@ -131,8 +137,8 @@ python3 scripts/vtt2txt.py --stats vtt/*.vtt  # word counts + detected format
 Batches of 10–12 videos, each batch writing its own `summaries/NN_<id>.md`.
 Dispatch them as parallel subagents if your agent has them; otherwise run the
 batches sequentially and write each file to disk before starting the next. The
-template and quality bar are in [`SKILL.md`](SKILL.md); a worked example is in
-[`examples/walkthrough.md`](examples/walkthrough.md).
+template and quality bar are in [`SKILL.md`](skills/youtube-subtitles-to-summary/SKILL.md); a worked example is in
+[`examples/walkthrough.md`](skills/youtube-subtitles-to-summary/examples/walkthrough.md).
 
 ---
 
@@ -140,13 +146,13 @@ template and quality bar are in [`SKILL.md`](SKILL.md); a worked example is in
 
 | Path | Purpose |
 |---|---|
-| [`SKILL.md`](SKILL.md) | The skill itself — procedure, templates, verification |
-| [`scripts/download_subs.py`](scripts/download_subs.py) | Playlist enumeration, language probing, paced download, error classification |
-| [`scripts/vtt2txt.py`](scripts/vtt2txt.py) | VTT → text, rolling/plain auto-detect |
-| [`references/pitfalls.md`](references/pitfalls.md) | The five failure modes, with verbatim symptoms |
-| [`references/vtt-formats.md`](references/vtt-formats.md) | Rolling vs plain VTT; the measured 660 vs 790 word result |
-| [`references/troubleshooting.md`](references/troubleshooting.md) | Symptom → cause → fix |
-| [`examples/walkthrough.md`](examples/walkthrough.md) | One video end to end, including a bad-summary counterexample |
+| [`SKILL.md`](skills/youtube-subtitles-to-summary/SKILL.md) | The skill itself — procedure, templates, verification |
+| [`scripts/download_subs.py`](skills/youtube-subtitles-to-summary/scripts/download_subs.py) | Playlist enumeration, language probing, paced download, error classification |
+| [`scripts/vtt2txt.py`](skills/youtube-subtitles-to-summary/scripts/vtt2txt.py) | VTT → text, rolling/plain auto-detect |
+| [`references/pitfalls.md`](skills/youtube-subtitles-to-summary/references/pitfalls.md) | The five failure modes, with verbatim symptoms |
+| [`references/vtt-formats.md`](skills/youtube-subtitles-to-summary/references/vtt-formats.md) | Rolling vs plain VTT; the measured 660 vs 790 word result |
+| [`references/troubleshooting.md`](skills/youtube-subtitles-to-summary/references/troubleshooting.md) | Symptom → cause → fix |
+| [`examples/walkthrough.md`](skills/youtube-subtitles-to-summary/examples/walkthrough.md) | One video end to end, including a bad-summary counterexample |
 
 ---
 
@@ -198,4 +204,4 @@ behaves identically everywhere.
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+MIT. See [LICENSE](skills/youtube-subtitles-to-summary/LICENSE).

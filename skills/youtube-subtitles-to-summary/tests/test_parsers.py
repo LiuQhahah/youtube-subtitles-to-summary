@@ -28,12 +28,12 @@ Kind: captions
 Language: en
 
 00:00:00.100 --> 00:00:01.855 align:start position:0%
- 
+
 AI <00:00:01.412><c>workloads</c>
 
 00:00:01.855 --> 00:00:01.865 align:start position:0%
 AI workloads
- 
+
 
 00:00:01.865 --> 00:00:03.334 align:start position:0%
 AI workloads
@@ -41,7 +41,7 @@ can <00:00:02.107><c>run </c><00:00:02.349><c>tens </c><00:00:02.591><c>of </c><
 
 00:00:03.334 --> 00:00:03.344 align:start position:0%
 can run tens of thousands of GPU
- 
+
 
 00:00:03.344 --> 00:00:04.789 align:start position:0%
 can run tens of thousands of GPU

@@ -1,8 +1,8 @@
 ---
 name: youtube-subtitles-to-summary
 description: "Download YouTube video or playlist subtitles and turn them into per-talk Chinese summaries. Handles the failure modes that actually break naive pipelines: bot detection (cookies required), PO token enforcement (bgutil server on :4416), HTTP 429 rate limiting (paced retries), per-video language-key irregularities (en vs en-orig), and the word-level rolling VTT format whose naive parse silently drops ~16% of words. Use when the user wants to read/summarize a YouTube video or playlist without watching it -- conference keynotes, courses, long interviews, podcast archives."
-version: 3.0.0
 license: MIT
+metadata: {"author":"Qiang Liu","language":"en","category":"media","short-description":"YouTube video or playlist subtitles to per-talk Chinese summaries","version":"3.0.0"}
 ---
 
 # YouTube Subtitles → Summary
