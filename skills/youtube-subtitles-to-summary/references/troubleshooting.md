@@ -133,7 +133,7 @@ python3 scripts/vtt2txt.py --stats vtt/*.vtt
 
 | Observed | Likely cause |
 |---|---|
-| ~16% low, text reads fine | token-extraction parser dropped untagged words — use the rolling merge |
+| ~17% low, text reads fine | token-extraction parser dropped the untagged first word of every timed line — use the rolling merge |
 | Far too high, stuttering | strip-and-join on rolling VTT — same fix |
 | Near zero | wrong file, or a `json3`/`srv3` format parsed as VTT |
 | ~60 words for a 20-min video | download truncated; re-download that video |

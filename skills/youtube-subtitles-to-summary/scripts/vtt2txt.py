@@ -9,9 +9,12 @@ single most common way to silently lose transcript content:
    window, and consecutive cues overlap heavily. A naive "strip tags, join
    lines" pass therefore duplicates text; a naive "take only the
    ``<ts><c>word</c>`` tokens" pass *drops every word YouTube did not wrap in a
-   ``<c>`` element*. On a real 790-word KubeCon keynote, the token-only approach
-   yields 660 words -- 130 words (16%) silently vanish. This module merges cues
-   by word-level longest suffix/prefix overlap instead, which is lossless.
+   ``<c>`` element* -- systematically the first word of every timed line. On a
+   real KubeCon keynote's ``en-orig`` track, the token-only approach yields 623
+   of 757 words. Of the 134 lost words, 128 are those untagged leading words
+   (127 timed lines, 129 leading-word occurrences); the other 6 are stray
+   occurrences the merge recovers from untagged display lines. This module merges
+   cues by word-level longest suffix/prefix overlap instead, which is lossless.
 
 2. **Manual captions** (``--write-subs``) are plain cue blocks with no word
    timestamps and no overlap. Those are handled by the simple branch: strip
@@ -138,10 +141,16 @@ def convert(path: str) -> tuple[str, str]:
 
 
 def default_dest(vtt_path: str, out_dir: str | None) -> str:
-    """vtt/abc.en.vtt -> text/abc.en.txt (keeps the language tag)."""
+    """vtt/abc.en.vtt -> text/abc.en.txt (keeps the language tag).
+
+    Only a parent directory literally named ``vtt`` is treated as the download
+    root. Any other location gets ``text/`` beside the input, so converting a
+    file that sits in the current directory does not write to its parent.
+    """
     name = os.path.basename(vtt_path)
     stem = VTT_SUFFIX_RE.sub(".txt", name)
-    base = os.path.dirname(os.path.dirname(os.path.abspath(vtt_path)))
+    parent = os.path.dirname(os.path.abspath(vtt_path))
+    base = os.path.dirname(parent) if os.path.basename(parent) == "vtt" else parent
     target_dir = out_dir if out_dir else os.path.join(base, "text")
     return os.path.join(target_dir, stem)
 

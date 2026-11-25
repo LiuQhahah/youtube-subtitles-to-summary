@@ -151,6 +151,15 @@ class TestOutputNaming(unittest.TestCase):
         dest = vtt2txt.default_dest("/x/vtt/abc123.en-orig.vtt", "/x/text")
         self.assertEqual(dest, "/x/text/abc123.en-orig.txt")
 
+    def test_vtt_subdir_uses_parent(self):
+        dest = vtt2txt.default_dest("/x/vtt/abc123.en.vtt", None)
+        self.assertEqual(dest, "/x/text/abc123.en.txt")
+
+    def test_vtt_in_cwd_stays_in_cwd(self):
+        # A file in the current directory must not write to its parent.
+        dest = vtt2txt.default_dest("/tmp/work/abc123.en.vtt", None)
+        self.assertEqual(dest, "/tmp/work/text/abc123.en.txt")
+
 
 class TestHaveSub(unittest.TestCase):
     def test_matches_both_lang_variants(self):

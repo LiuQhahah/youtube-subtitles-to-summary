@@ -24,6 +24,19 @@ Or skip the CLI entirely — it is just files. Clone anywhere and point your age
 at `SKILL.md`, or copy the directory into whatever skills path your agent reads
 (`.claude/skills/`, `.codex/skills/`, `.cursor/rules/`, ...).
 
+**Read the installer output, not just its last line.** `skills add` prints `Done!`
+even when an individual agent failed — a permission error on an existing install
+looks like this:
+
+```
+✗ youtube-subtitles-to-summary → Claude Code: EPERM: operation not permitted, unlink '.../LICENSE'
+└  Done!  Review skills before use; they run with full agent permissions.
+```
+
+That is a failed install behind a success message. Check that each agent line
+starts with `✓`, or install without `-g` into the project directory, which does
+not touch protected user-level paths.
+
 ---
 
 ## Why another one?
@@ -38,12 +51,14 @@ because building a 35-talk conference archive hit all five in sequence:
 | **PO token enforcement** | `nsig extraction failed` / 403, looks like a network problem | retries forever, blames CDN |
 | **HTTP 429** | batch stalls at ~40% complete | no pacing, no resume |
 | **Language-key irregularity** | `en` 429s while `en-orig` works; some videos have only `-orig` | hardcodes `--sub-langs en` |
-| **Rolling word-level VTT** | transcript reads fine but is **16% short** | token extraction drops untagged words |
+| **Rolling word-level VTT** | transcript reads fine but is **~17% short** | token extraction drops the first word of every timed line |
 
-That last one is the reason this skill exists. On a 790-word keynote, the
-token-extraction approach used by several published skills produces **660
-words** — 130 words silently missing, in text that still reads fluently. A
-summary built on it is confidently wrong, and nothing signals the loss.
+That last one is the reason this skill exists. On a 4-minute keynote, the
+token-extraction approach used by several published skills drops **the first
+word of every timed line** — 129 of 789 words on the `en` track, 134 of 757 on
+the `en-orig` track this script actually downloads. The surviving text still
+reads fluently. A summary built on it is confidently wrong, and nothing signals
+the loss.
 
 This skill's parser merges cues by word-level longest suffix/prefix overlap
 instead, which is lossless regardless of which words YouTube tagged.
@@ -150,7 +165,7 @@ template and quality bar are in [`SKILL.md`](skills/youtube-subtitles-to-summary
 | [`scripts/download_subs.py`](skills/youtube-subtitles-to-summary/scripts/download_subs.py) | Playlist enumeration, language probing, paced download, error classification |
 | [`scripts/vtt2txt.py`](skills/youtube-subtitles-to-summary/scripts/vtt2txt.py) | VTT → text, rolling/plain auto-detect |
 | [`references/pitfalls.md`](skills/youtube-subtitles-to-summary/references/pitfalls.md) | The five failure modes, with verbatim symptoms |
-| [`references/vtt-formats.md`](skills/youtube-subtitles-to-summary/references/vtt-formats.md) | Rolling vs plain VTT; the measured 660 vs 790 word result |
+| [`references/vtt-formats.md`](skills/youtube-subtitles-to-summary/references/vtt-formats.md) | Rolling vs plain VTT; the measured 623 vs 757 word result and why the loss is systematic |
 | [`references/troubleshooting.md`](skills/youtube-subtitles-to-summary/references/troubleshooting.md) | Symptom → cause → fix |
 | [`examples/walkthrough.md`](skills/youtube-subtitles-to-summary/examples/walkthrough.md) | One video end to end, including a bad-summary counterexample |
 
@@ -163,9 +178,14 @@ Built on the KubeCon NA keynote playlist (35 talks, 4.5 hours, 39,167 words):
 | Metric | Value |
 |---|---|
 | Subtitles downloaded | 35/35 (unpaced: 15/35) |
-| Words recovered vs token-extraction parser | +16.5% on a sampled talk |
-| Per-video summaries | 35/35, median 322 Chinese characters |
+| Words recovered vs token-extraction parser | +21.5% on a sampled talk (757 vs 623, `en-orig` track) |
+| Per-video summaries | 35/35, median 322 Chinese characters across the whole file (273 in the body paragraph that SKILL.md constrains) |
 | Broken transcript links | 0 |
+
+The recovery figure is a *rate relative to the lossy parser*, not a share of the
+transcript: 134 of the 757 words are recovered, which is 21.5% more text than
+token extraction produces and 17.7% of the finished transcript. Both denominators
+are legitimate; they are not interchangeable.
 
 ---
 

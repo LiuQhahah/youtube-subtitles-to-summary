@@ -1,7 +1,8 @@
 # Example — input and output for one video
 
 A worked example so the expected shape is unambiguous. Video:
-`https://www.youtube.com/watch?v=PjZ4kpLChpE` (4 min, 790 words).
+`https://www.youtube.com/watch?v=PjZ4kpLChpE` (4 min; 757 words on the
+`en-orig` track the script selects, 789 on `en` — see the note in Stage 2).
 
 ---
 
@@ -43,25 +44,48 @@ python3 scripts/vtt2txt.py vtt/PjZ4kpLChpE.en-orig.vtt
 text/PjZ4kpLChpE.en-orig.txt: 757 words (rolling)
 ```
 
-`(rolling)` confirms the auto-detect chose the overlap-merge path. A
-token-extraction parser on the same file yields 660 words.
+`(rolling)` confirms the auto-detect chose the overlap-merge path.
+
+**Which track matters for every number below.** This video exposes both `en` and
+`en-orig`, and they are different transcripts:
+
+| Track | Merged words | Token-extraction words |
+|---|---|---|
+| `en-orig` (what the script picks) | 757 | 623 |
+| `en` (429s on this video) | 789 | 660 |
+
+The walkthrough stays on `en-orig` throughout, so its reference count is **757**.
+The widely quoted 660/789 pair belongs to the `en` track — keep it in mind only
+when comparing against other published skills, which request `en` directly.
 
 ---
 
 ## Stage 3 — transcript excerpt
 
-First ~70 words of `text/PjZ4kpLChpE.en-orig.txt`:
+First 70 words of `text/PjZ4kpLChpE.en-orig.txt`, verbatim:
 
 > AI workloads can spin up tens of thousands of GPU instances per cluster, and
 > things break at that scale. When they do, a managed Kubernetes provider has
 > three choices. One, they can fork it and keep the fix. Two, they can let their
 > customers try and work around it. Or three, they can fix it upstream. At AWS,
-> we run some of the largest clusters in the world, and we choose to fix the
-> problems we find at that scale upstream.
+> we operate some of the world's largest clusters in the world, and
 
-Clean, no duplication, no gaps. Compare with what a token-extraction parser
-produces from the same VTT — the words `can`, `things`, `they`, and `and` are
-absent there because YouTube did not wrap them in `<c>` tags.
+Clean, no duplication, no gaps. A token-extraction parser run on the same VTT
+loses 134 of these 757 words, and the loss has a precise shape: **every timed
+line in an auto-caption cue begins with one untagged word**, and that word is
+dropped. Of the 127 timed lines in this file, all 127 have an untagged leading
+word — 128 of the 134 losses, with 6 more on untagged display lines. Two of them
+land inside the excerpt above — `thousands` and `provider`:
+
+```
+provider<00:00:08.600><c> has</c><00:00:08.800><c> three</c><00:00:09.100><c> choices.</c>
+thousands<00:00:02.300><c> of</c><00:00:02.400><c> GPU</c><00:00:02.800><c> instances</c>...
+```
+
+Note where the tag starts: after the first word, not before it. The regex in
+`references/vtt-formats.md` only captures `<ts><c>...</c>` pairs, so those
+leading words are never captured. The surviving text still reads fluently —
+which is the whole danger.
 
 ---
 
@@ -72,9 +96,9 @@ absent there because YouTube did not wrap them in `<c>` tags.
 ```markdown
 # KubeCon NA 演讲 #3：超大规模集群的瓶颈如何修回上游——从 watch cache 到 containerd
 
-> 英文标题：Engineering Kubernetes for the Next Era of Workloads by Mike Stefaniak, AWS（4min，约 790 词）
+> 英文标题：Engineering Kubernetes for the Next Era of Workloads by Mike Stefaniak, AWS（4min，约 757 词）
 > 演讲者：Mike Stefaniak, AWS
-> 原始字幕：[text/PjZ4kpLChpE.en.txt](text/PjZ4kpLChpE.en.txt)
+> 原始字幕：[text/PjZ4kpLChpE.en-orig.txt](text/PjZ4kpLChpE.en-orig.txt)
 
 ---
 
@@ -82,13 +106,15 @@ absent there because YouTube did not wrap them in `<c>` tags.
 
 ---
 
-*摘要由字幕全文分析生成，完整转录见 `text/PjZ4kpLChpE.en.txt`。*
+*摘要由字幕全文分析生成，完整转录见 `text/PjZ4kpLChpE.en-orig.txt`。*
 ```
 
 Properties worth copying:
 
 - header carries duration and word count, so a reader can judge whether to read
-- one paragraph, three bold labels, ~200 Chinese characters
+- one paragraph, three bold labels (this one is condensed to 160 Chinese
+  characters for readability; the shipped summary is 259, inside the 200–350 band
+  SKILL.md asks for)
 - technical terms untranslated (`watch cache`, `selector store`, `scheduler`)
 - every number traceable to the transcript (`5,000`, `100,000`, `0.5`, `2ms`, `4x`, `300+`)
 - link points at a file that exists
@@ -98,7 +124,7 @@ Properties worth copying:
 ## Stage 5 — index row
 
 ```markdown
-| 3 | 4min | Mike Stefaniak, AWS | 超大规模集群的瓶颈如何修回上游 | [Engineering Kubernetes for the Next Era of Workloads](summaries/03_PjZ4kpLChpE.md) | 790 |
+| 3 | 4min | Mike Stefaniak, AWS | 超大规模集群的瓶颈如何修回上游 | [Engineering Kubernetes for the Next Era of Workloads](summaries/03_PjZ4kpLChpE.md) | 757 |
 ```
 
 ---

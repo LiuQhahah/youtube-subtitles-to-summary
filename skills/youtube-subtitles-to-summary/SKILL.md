@@ -1,6 +1,6 @@
 ---
 name: youtube-subtitles-to-summary
-description: "Download YouTube video or playlist subtitles and turn them into per-talk Chinese summaries. Handles the failure modes that actually break naive pipelines: bot detection (cookies required), PO token enforcement (bgutil server on :4416), HTTP 429 rate limiting (paced retries), per-video language-key irregularities (en vs en-orig), and the word-level rolling VTT format whose naive parse silently drops ~16% of words. Use when the user wants to read/summarize a YouTube video or playlist without watching it -- conference keynotes, courses, long interviews, podcast archives."
+description: "Download YouTube video or playlist subtitles and turn them into per-talk Chinese summaries. Handles the failure modes that actually break naive pipelines: bot detection (cookies required), PO token enforcement (bgutil server on :4416), HTTP 429 rate limiting (paced retries), per-video language-key irregularities (en vs en-orig), and the word-level rolling VTT format whose naive parse silently drops the first word of every timed line (~17% of words). Use when the user wants to read/summarize a YouTube video or playlist without watching it -- conference keynotes, courses, long interviews, podcast archives."
 license: MIT
 metadata: {"author":"Qiang Liu","language":"en","category":"media","short-description":"YouTube video or playlist subtitles to per-talk Chinese summaries","version":"3.0.0"}
 ---
@@ -19,7 +19,7 @@ naive pipeline fail, each of which cost a real debugging session to identify:
 | PO token enforcement | `nsig extraction failed`, HTTP 403 | blame the network, never retry correctly |
 | HTTP 429 | `Unable to download video subtitles: HTTP Error 429` | fetch all videos in a loop, stall at ~40% |
 | Language-key irregularity | `Requested format is not available`, or 429 on a track that exists | hardcode `--sub-langs en` |
-| Rolling word-level VTT | transcript looks fine but is missing 16% of words | strip tags and join, or keep only `<c>` tokens |
+| Rolling word-level VTT | transcript looks fine but is missing ~17% of words | strip tags and join, or keep only `<c>` tokens |
 
 ## When to use
 
@@ -66,6 +66,10 @@ curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:4416/
 **A `400` is healthy.** The server answers 400 with a hint body on a bare GET.
 `000` (connection refused) or `5xx` means it is down.
 
+`download_subs.py` runs this same probe itself and aborts early when the server
+is down. If you have already done the check above and want to skip the duplicate
+probe, pass `--skip-pot-check`; the flag exists only for that case.
+
 ### 2. Enumerate the playlist
 
 ```bash
@@ -100,16 +104,22 @@ does not exist burns a request and frequently returns 429. See
 python3 scripts/vtt2txt.py vtt/*.vtt
 ```
 
-Writes `text/<videoId>.<lang>.txt`. Verify word counts are sane before
-summarizing — roughly 130–160 words per minute of speech:
+Writes `text/<videoId>.<lang>.txt`. Then confirm the parser picked the right
+branch before summarizing:
 
 ```bash
 python3 scripts/vtt2txt.py --stats vtt/*.vtt
 ```
 
-If a 4-minute talk reports 660 words instead of ~790, you are using a
-token-extraction parser instead of the rolling-window merge. See
-`references/vtt-formats.md`.
+Check the format column, not the word count. `--stats` prints
+`<path>\t<format>\t<count>`, where format is `rolling` when the overlap-merge
+branch ran and `plain` when it did not. For an auto-caption file, `plain` means
+the detector missed and you are about to summarize a lossy parse.
+
+Word count alone cannot make this call: 660 words in 4 minutes is 165 wpm and
+757 is 190 wpm — both are plausible speech rates, so a short-looking count may
+just be a fast speaker. Use the count only to catch the catastrophic case (a
+4-minute talk under ~60 words). See `references/vtt-formats.md`.
 
 ### 4. Summarize
 
@@ -122,10 +132,12 @@ the same either way; only the dispatch mechanism differs.
   truncated past that.
 - Each batch writes its own files directly, so no single response has to carry
   all the text.
-- Each summarizer gets: the batch's `NN \t videoId \t duration \t wordCount \t
-  title` rows, the path to `text/`, the instruction to read each file **in
-  full**, the exact output path and template, and an explicit prohibition on
-  inventing numbers not present in the transcript.
+- Each summarizer gets: the batch's rows from `manifest.tsv` (`NN \t videoId \t
+  duration \t title` — four columns, no word count), the path to `text/`, the
+  instruction to read each file **in full**, the exact output path and template,
+  and an explicit prohibition on inventing numbers not present in the transcript.
+  If you want word counts in the brief, join them in yourself from
+  `vtt2txt.py --stats`; `manifest.tsv` does not carry that column.
 
 **Path A — agent supports parallel subagents** (Claude Code, Codex, Cursor,
 Gemini CLI, Copilot, OpenCode, and most of the others): dispatch one subagent per
@@ -201,9 +213,16 @@ python3 scripts/vtt2txt.py --stats vtt/*.vtt | awk -F'\t' '$3 < 60 {print "SHORT
 ls summaries/ | wc -l   # must equal the manifest line count
 
 # 3. no broken transcript links inside summaries
-grep -ho 'text/[A-Za-z0-9_-]*\.txt' summaries/*.md | sort -u \
-  | while read p; do [ -f "$p" ] || echo "BROKEN: $p"; done
+links=$(grep -ho 'text/[A-Za-z0-9_.-]*\.txt' summaries/*.md | sort -u)
+echo "unique transcript links: $(printf '%s\n' "$links" | grep -c .)"
+[ -n "$links" ] || echo "NO LINKS FOUND: the link check is not actually running"
+printf '%s\n' "$links" | while read p; do [ -f "$p" ] || echo "BROKEN: $p"; done
 ```
+
+Check 3 must print a non-zero link count. A silent pass and a check that matched
+nothing look identical from the outside — that is exactly how a broken link
+check hides for months. Note the `.` inside the character class: real targets are
+`text/<id>.<lang>.txt`, so a class of `[A-Za-z0-9_-]` matches nothing at all.
 
 A word count under ~60 for a video longer than 30 s means the caption track is
 wrong or the parse dropped content — investigate before summarizing, because a
@@ -245,4 +264,4 @@ The five that matter most:
 
 The failure-mode knowledge here comes from building a 35-talk KubeCon keynote
 archive end to end. The VTT parser replaces a token-extraction approach that
-measurably lost 16% of words on real auto-captions.
+measurably lost 134 of 757 words on real auto-captions, 128 of them the untagged first word of a timed line.

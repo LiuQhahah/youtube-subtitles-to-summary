@@ -46,7 +46,7 @@ text = re.sub(r'<[^>]+>', '', content)
 ```
 
 Result: heavy duplication. "AI workloads" appears once per cue in the window,
-so a 790-word talk yields several thousand words of stutter.
+so a 757-word talk yields several thousand words of stutter.
 
 **Wrong #2 — extract only `<ts><c>word</c>` tokens.**
 
@@ -56,19 +56,45 @@ for m in re.finditer(r'<(\d+:\d+:\d+\.\d+)><c>(.*?)</c>', content):
 ```
 
 This looks clean and is the approach shipped in several published skills. It is
-**lossy**: property 3 means any word YouTube did not tag disappears. On
-`PjZ4kpLChpE` (a 4-minute KubeCon keynote) this yields **660 words instead of
-790** — 130 words, 16.5% of the content, silently missing. The result reads
+**lossy**: property 3 means any word YouTube did not tag disappears, and the
+untagged word is systematically the **first word of every timed line**. On the
+`en` track of `PjZ4kpLChpE` (a 4-minute KubeCon keynote) this yields **660 words
+instead of 789** — 129 words, 16.3% of the content, silently missing. On the
+`en-orig` track of the same video, which is what `download_subs.py` selects, it
+yields **623 instead of 757** — 134 words, 17.7%. Either way the result reads
 fluently, which is what makes it dangerous: a summary built on it is confidently
 wrong.
 
-Measured, same input file:
+**The mechanism, precisely.** In a rolling auto-caption cue, the timed line looks
+like this:
 
-| Parser | Words | Content |
-|---|---|---|
-| token extraction | 660 | drops every untagged word |
-| strip-and-join | thousands | massive duplication |
-| rolling-window merge | 790 | complete, no duplication |
+```
+provider<00:00:08.600><c> has</c><00:00:08.800><c> three</c><00:00:09.100><c> choices.</c>
+```
+
+The first word sits *before* the first timestamp, outside any `<c>` element. The
+regex above only captures `<ts><c>...</c>` pairs, so it never sees it. On
+`PjZ4kpLChpE.en-orig.vtt`, all 127 timed lines have an untagged leading word —
+127 of 127, no exceptions — giving 129 leading-word occurrences. Those account
+for 128 of the 134 lost words. The remaining 6 (`operate`, `snapshot`, `next`,
+`integer`, `bottleneck`, `algorithm`) sit on untagged display lines rather than
+timed lines; the overlap merge recovers them because the same text reappears in
+the next cue's window, and the token-only parse never sees them at all.
+
+So the loss is not one word per line by arithmetic coincidence — it is
+systematic, and 96% of it is the leading-word bug.
+
+Measured, same input files:
+
+| Parser | `en-orig` words | `en` words | Content |
+|---|---|---|---|
+| token extraction | 623 | 660 | drops the first word of every timed line |
+| strip-and-join | thousands | thousands | massive duplication |
+| rolling-window merge | 757 | 789 | complete, no duplication |
+
+Which track you are on matters when comparing against other tools: published
+skills request `en` directly, so their 660 is not comparable to a 757-word
+`en-orig` transcript.
 
 ### The correct parse: word-level longest overlap merge
 
@@ -123,19 +149,30 @@ occasionally appear.
 
 ## Sanity check: words per minute
 
-Speech runs roughly **130–160 words per minute**. Use it to catch a bad parse
-without reading the text:
+Speech runs roughly **130–160 words per minute** for ordinary delivery and
+**180–200 wpm** for conference keynotes. Use it to catch a catastrophic parse —
+an empty or near-empty transcript — without reading the text:
 
 ```bash
 python3 scripts/vtt2txt.py --stats vtt/*.vtt
 ```
 
-A 4-minute talk should land near 520–640 words at 130–160 wpm; the KubeCon
-keynote above is 790 because keynote delivery is faster (~200 wpm). A 4-minute
-talk reporting 660 when the same video should be 790 is inside the plausible
-band — which is exactly why the per-minute heuristic alone is insufficient and
-the parser choice matters. When in doubt, compare two parsers on one file and
-diff the word lists.
+A 4-minute talk should land somewhere between 520 and 800 words. The KubeCon
+keynote above is 757 (`en-orig`) / 789 (`en`), i.e. ~190 wpm — fast but normal
+for a keynote.
+
+**The per-minute heuristic cannot tell you which parser ran.** 660 words in
+4 minutes is 165 wpm, inside every plausible band, and so is 757. Both are
+believable speech rates, so the number alone never distinguishes a lossy parse
+from a fast speaker. Use it only to catch transcripts that are wildly short (a
+4-minute talk reporting under ~60 words is broken). To actually verify the parser,
+check the format column — `--stats` prints `rolling` when the overlap-merge branch
+ran and `plain` when it did not — and for auto-captions `plain` means the
+detector missed.
+
+If you want a second opinion on the same file, compare two parsers and diff the
+word lists: the token-extraction regex above will be short by exactly the number
+of timed lines.
 
 ---
 
