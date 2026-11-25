@@ -1,12 +1,28 @@
 # youtube-subtitles-to-summary
 
-A Claude Code / Codex skill that turns a YouTube video or an entire playlist
-into clean transcripts plus one summary file per talk — without watching
-anything.
+An agent skill that turns a YouTube video or an entire playlist into clean
+transcripts plus one summary file per talk — without watching anything.
+
+It is a plain [Agent Skills](https://skills.sh) package: `SKILL.md` plus
+stdlib-only Python scripts, no platform-specific API. The `skills` CLI installs
+it into any of its supported agents — Claude Code, Codex, Cursor, Gemini CLI,
+GitHub Copilot, OpenCode, Cline, Windsurf, Zed, Amp, Goose, Continue, Qwen Code,
+Kimi Code CLI, Warp and about 65 more.
 
 ```bash
 npx skills add LiuQhahah/youtube-subtitles-to-summary -g
 ```
+
+Install for specific agents instead of everything:
+
+```bash
+npx skills add LiuQhahah/youtube-subtitles-to-summary -g --agent claude-code --agent codex
+npx skills add LiuQhahah/youtube-subtitles-to-summary -g --agent '*' -y   # all detected
+```
+
+Or skip the CLI entirely — it is just files. Clone anywhere and point your agent
+at `SKILL.md`, or copy the directory into whatever skills path your agent reads
+(`.claude/skills/`, `.codex/skills/`, `.cursor/rules/`, ...).
 
 ---
 
@@ -112,9 +128,10 @@ python3 scripts/vtt2txt.py --stats vtt/*.vtt  # word counts + detected format
 
 ### Then summarize
 
-Dispatch parallel subagents, 10–12 videos each, each writing its own
-`summaries/NN_<id>.md`. The template and quality bar are in
-[`SKILL.md`](SKILL.md); a worked example is in
+Batches of 10–12 videos, each batch writing its own `summaries/NN_<id>.md`.
+Dispatch them as parallel subagents if your agent has them; otherwise run the
+batches sequentially and write each file to disk before starting the next. The
+template and quality bar are in [`SKILL.md`](SKILL.md); a worked example is in
 [`examples/walkthrough.md`](examples/walkthrough.md).
 
 ---
@@ -159,6 +176,23 @@ ls summaries/ | wc -l          # must equal manifest line count
 grep -ho 'text/[A-Za-z0-9_.-]*\.txt' summaries/*.md | sort -u \
   | while read p; do [ -f "$p" ] || echo "BROKEN: $p"; done
 ```
+
+---
+
+## Platform support
+
+This is a plain Agent Skills package — `SKILL.md` plus stdlib-only Python. No
+platform-specific API, no bundler, no dependencies. The only capability that
+varies is how step 4 fans out work:
+
+| Agent capability | Path |
+|---|---|
+| parallel subagents | dispatch 10–12 videos per subagent (fastest) |
+| single agent only | run batches sequentially, write each file before the next |
+| no agent (scripting an LLM) | call the model per transcript with the template as system prompt |
+
+Everything before step 4 — download, convert, verify — is plain `python3` and
+behaves identically everywhere.
 
 ---
 

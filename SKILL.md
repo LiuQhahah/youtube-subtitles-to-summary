@@ -111,18 +111,39 @@ If a 4-minute talk reports 660 words instead of ~790, you are using a
 token-extraction parser instead of the rolling-window merge. See
 `references/vtt-formats.md`.
 
-### 4. Summarize with parallel subagents
+### 4. Summarize
 
-Group the manifest into batches of 10–12 videos. Dispatch one subagent per
-batch, each writing its own files directly. Never have one subagent summarize
-more than ~12 videos: output quality degrades and responses get truncated.
+How you fan this out depends on what your agent supports. The batching rules are
+the same either way; only the dispatch mechanism differs.
 
-Give each subagent:
+**Batching rules (all paths):**
 
-- the batch's `NN \t videoId \t duration \t wordCount \t title` rows
-- the path to `text/` and the instruction to read each file **in full**
-- the exact output path and template (below)
-- an explicit prohibition on inventing numbers not present in the transcript
+- 10–12 videos per batch, never more. Output quality degrades and responses get
+  truncated past that.
+- Each batch writes its own files directly, so no single response has to carry
+  all the text.
+- Each summarizer gets: the batch's `NN \t videoId \t duration \t wordCount \t
+  title` rows, the path to `text/`, the instruction to read each file **in
+  full**, the exact output path and template, and an explicit prohibition on
+  inventing numbers not present in the transcript.
+
+**Path A — agent supports parallel subagents** (Claude Code, Codex, Cursor,
+Gemini CLI, Copilot, OpenCode, and most of the others): dispatch one subagent per
+batch concurrently. This is what the 35-talk archive used — 3 subagents × 12
+videos, roughly 4 minutes wall clock.
+
+**Path B — no subagent support, or one long-running agent:** process batches
+sequentially in the same context, but write each summary to disk before starting
+the next batch and re-read the transcript rather than recalling it. Slower, same
+output. The per-batch file boundary is what keeps quality from decaying.
+
+**Path C — scripting a non-agent LLM:** skip the agent entirely. Read
+`text/*.txt`, and for each file call your model with the template from "Per-video
+summary template" as the system prompt and the transcript as the user message.
+Batch by 10–12 for cost, not for context reasons.
+
+Whatever the path, verify the batch count matches the manifest before assembling
+the index — a silently dropped batch is the most common failure at this step.
 
 ### 5. Assemble the index
 
