@@ -1,0 +1,227 @@
+---
+name: youtube-subtitles-to-summary
+description: "Download YouTube video or playlist subtitles and turn them into per-talk Chinese summaries. Handles the failure modes that actually break naive pipelines: bot detection (cookies required), PO token enforcement (bgutil server on :4416), HTTP 429 rate limiting (paced retries), per-video language-key irregularities (en vs en-orig), and the word-level rolling VTT format whose naive parse silently drops ~16% of words. Use when the user wants to read/summarize a YouTube video or playlist without watching it -- conference keynotes, courses, long interviews, podcast archives."
+version: 3.0.0
+license: MIT
+---
+
+# YouTube Subtitles → Summary
+
+Turn a YouTube video or an entire playlist into clean transcripts plus one
+summary file per talk, without watching anything.
+
+The value of this skill is not "run yt-dlp". It is the five things that make a
+naive pipeline fail, each of which cost a real debugging session to identify:
+
+| Failure | Symptom | What naive pipelines do |
+|---|---|---|
+| Bot detection | `Sign in to confirm you're not a bot` | omit cookies, fail on every video |
+| PO token enforcement | `nsig extraction failed`, HTTP 403 | blame the network, never retry correctly |
+| HTTP 429 | `Unable to download video subtitles: HTTP Error 429` | fetch all videos in a loop, stall at ~40% |
+| Language-key irregularity | `Requested format is not available`, or 429 on a track that exists | hardcode `--sub-langs en` |
+| Rolling word-level VTT | transcript looks fine but is missing 16% of words | strip tags and join, or keep only `<c>` tokens |
+
+## When to use
+
+- The user gives a YouTube URL or playlist and wants to know what is in it
+- Conference replay archives (KubeCon, P99 CONF, re:Invent, PyCon...) to be
+  triaged by topic
+- A long interview, course, or podcast episode to be read instead of watched
+- Any batch where the user wants **one summary file per video**, not one giant
+  document
+
+## When not to use
+
+- The user wants the video/audio file itself — use `yt-dlp -f best` directly
+- Live streams (captions are unstable mid-stream)
+- Non-YouTube sources without a subtitle track (Vimeo, Twitch) — different flow
+
+## Procedure
+
+### 1. Preflight
+
+```bash
+yt-dlp --version
+python3 --version          # 3.9+; this skill uses no third-party packages
+```
+
+Then confirm the PO token provider is registered. This is the check that
+predicts whether auto-caption downloads will work at all:
+
+```bash
+yt-dlp --verbose --simulate 'https://www.youtube.com/watch?v=dQw4w9WgXcQ' 2>&1 \
+  | grep -i 'PO Token Providers'
+```
+
+Expected: a line containing `bgutil:http` (e.g. `bgutil:http-2.0.2 (external)`).
+If the line is absent, no PO token will be generated and every auto-caption
+download will fail with 403. See `references/troubleshooting.md` for install.
+
+Confirm the local POT server is up:
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:4416/
+```
+
+**A `400` is healthy.** The server answers 400 with a hint body on a bare GET.
+`000` (connection refused) or `5xx` means it is down.
+
+### 2. Enumerate the playlist
+
+```bash
+python3 scripts/download_subs.py --playlist '<playlist_url>' --out . --lang en
+```
+
+This writes `manifest.tsv` (`NN \t videoId \t duration \t title`) and downloads
+every subtitle. For a single video:
+
+```bash
+python3 scripts/download_subs.py --url '<video_url>' --out .
+```
+
+The script is re-runnable: videos whose `.vtt` already exists are skipped, so a
+failed batch is resumed by running the same command again.
+
+**Pacing defaults, and why they are not optional.** 25 s between videos, 90 s
+backoff on 429, up to 3 passes over whatever is still missing. A 35-video
+KubeCon playlist fails at 15/35 without this and reaches 35/35 with it. Tune
+with `--sleep`, `--backoff`, `--max-rounds`; do not remove the pacing.
+
+**Do not hardcode `--sub-langs en`.** The script probes each video's real
+caption keys via `-J` and picks the best match, because the key set is
+per-video: a keynote may expose only `en-orig`, a normal upload exposes `en`, and
+a non-English talk exposes `en` only as a translation. Requesting a key that
+does not exist burns a request and frequently returns 429. See
+`references/pitfalls.md`.
+
+### 3. Convert VTT to clean text
+
+```bash
+python3 scripts/vtt2txt.py vtt/*.vtt
+```
+
+Writes `text/<videoId>.<lang>.txt`. Verify word counts are sane before
+summarizing — roughly 130–160 words per minute of speech:
+
+```bash
+python3 scripts/vtt2txt.py --stats vtt/*.vtt
+```
+
+If a 4-minute talk reports 660 words instead of ~790, you are using a
+token-extraction parser instead of the rolling-window merge. See
+`references/vtt-formats.md`.
+
+### 4. Summarize with parallel subagents
+
+Group the manifest into batches of 10–12 videos. Dispatch one subagent per
+batch, each writing its own files directly. Never have one subagent summarize
+more than ~12 videos: output quality degrades and responses get truncated.
+
+Give each subagent:
+
+- the batch's `NN \t videoId \t duration \t wordCount \t title` rows
+- the path to `text/` and the instruction to read each file **in full**
+- the exact output path and template (below)
+- an explicit prohibition on inventing numbers not present in the transcript
+
+### 5. Assemble the index
+
+Write `INDEX.md` as a sortable table plus a topic navigation, and
+`SUMMARIES.md` as the concatenation of all per-video bodies. Both are cheap to
+generate from the summary files and much easier to skim than prose.
+
+## Output layout
+
+```
+<workdir>/
+  manifest.tsv          NN \t videoId \t duration \t title
+  vtt/<videoId>.<lang>.vtt
+  text/<videoId>.<lang>.txt
+  summaries/NN_<videoId>.md
+  INDEX.md
+  SUMMARIES.md
+```
+
+One summary per video, filename `NN_<videoId>.md`, is deliberate: each file is
+independently quotable and linkable, and its header carries enough metadata to
+decide whether the talk is worth reading.
+
+### Per-video summary template
+
+```markdown
+# <Series> 演讲 #3：<中文标题>
+
+> 英文标题：<English title> by <speaker>（15min，约 2283 词）
+> 演讲者：<speaker>, <org>
+> 原始字幕：[text/<videoId>.en.txt](text/<videoId>.en.txt)
+
+---
+
+**主题与背景**：... **核心内容/技术亮点**：... **演讲者观点/结论**：...
+
+---
+
+*摘要由字幕全文分析生成，完整转录见 `text/<videoId>.en.txt`。*
+```
+
+Target 200–350 Chinese characters of body. Keep technical terms, version
+numbers, and product names in their original form; do not translate `io_uring`,
+`Karpenter`, `containerd`, or `eBPF`.
+
+## Verification
+
+Run these before reporting done:
+
+```bash
+# 1. every video has a transcript and none is suspiciously short
+python3 scripts/vtt2txt.py --stats vtt/*.vtt | awk -F'\t' '$3 < 60 {print "SHORT:", $0}'
+
+# 2. every video has a summary
+ls summaries/ | wc -l   # must equal the manifest line count
+
+# 3. no broken transcript links inside summaries
+grep -ho 'text/[A-Za-z0-9_-]*\.txt' summaries/*.md | sort -u \
+  | while read p; do [ -f "$p" ] || echo "BROKEN: $p"; done
+```
+
+A word count under ~60 for a video longer than 30 s means the caption track is
+wrong or the parse dropped content — investigate before summarizing, because a
+summary of a truncated transcript is confidently wrong.
+
+## Pitfalls
+
+Full detail in `references/pitfalls.md` and `references/troubleshooting.md`.
+The five that matter most:
+
+1. **Cookies are mandatory.** `--cookies-from-browser chrome` (the browser must
+   be logged into YouTube). No cookies → bot check → zero downloads.
+2. **`en` vs `en-orig` is not cosmetic.** For an English talk, `en` is served
+   through the translation path and returns 429 under load, while `en-orig` is
+   served directly and succeeds. Prefer `-orig` when it exists.
+3. **Never parse `--list-subs`.** Its output repeats the format list once per
+   translation track and is not machine-readable. Use `-J` and read
+   `subtitles` / `automatic_captions`.
+4. **Judge success by the file, not the exit code.** yt-dlp exits non-zero and
+   prints a traceback when one requested track fails while another succeeded.
+   Check for the `.vtt` on disk first, then classify the error.
+5. **Auto-caption VTT is a rolling window.** Each cue's last line is the whole
+   current window; consecutive cues overlap. Merge by word-level longest
+   suffix/prefix overlap. Stripping tags duplicates text; keeping only `<c>`
+   tokens drops untagged words.
+
+## Files
+
+| Path | Purpose |
+|---|---|
+| `scripts/download_subs.py` | Playlist enumeration, language probing, paced download with 429/bot/PO-token classification |
+| `scripts/vtt2txt.py` | VTT → text; detects rolling vs plain format and merges losslessly |
+| `references/pitfalls.md` | The five failure modes, with symptoms and fixes |
+| `references/vtt-formats.md` | Rolling vs plain VTT, why token extraction loses words |
+| `references/troubleshooting.md` | PO token install, cookie refresh, 429 strategy |
+| `examples/` | Real transcript excerpt and summary, for format reference |
+
+## Attribution
+
+The failure-mode knowledge here comes from building a 35-talk KubeCon keynote
+archive end to end. The VTT parser replaces a token-extraction approach that
+measurably lost 16% of words on real auto-captions.
