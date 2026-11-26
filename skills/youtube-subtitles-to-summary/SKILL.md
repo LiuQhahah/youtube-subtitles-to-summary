@@ -1,8 +1,8 @@
 ---
 name: youtube-subtitles-to-summary
-description: "Download YouTube video or playlist subtitles and turn them into per-talk Chinese summaries. Handles the failure modes that actually break naive pipelines: bot detection (cookies required), PO token enforcement (bgutil server on :4416), HTTP 429 rate limiting (paced retries), per-video language-key irregularities (en vs en-orig), and the word-level rolling VTT format whose naive parse silently drops the first word of every timed line (~17% of words). Use when the user wants to read/summarize a YouTube video or playlist without watching it -- conference keynotes, courses, long interviews, podcast archives."
+description: "Summarize a YouTube video or an entire playlist from its subtitles: fetch the transcript, convert the rolling word-level VTT losslessly, and write one summary file per talk in the user's own language. Use when the user wants a YouTube summary, video notes, lecture or conference-talk digests, podcast recaps, or a readable transcript without watching. Handles the failure modes that break naive pipelines: bot detection (cookies required), PO token enforcement (bgutil server on :4416), HTTP 429 rate limiting (paced retries), per-video language-key irregularities (en vs en-orig), and the word-level rolling VTT format whose naive parse silently drops the first word of every timed line (~17% of words)."
 license: MIT
-metadata: {"author":"Qiang Liu","language":"en","category":"media","short-description":"YouTube video or playlist subtitles to per-talk Chinese summaries","version":"3.0.0"}
+metadata: {"author":"Qiang Liu","language":"en","category":"media","short-description":"YouTube video or playlist subtitles to per-talk summaries in the user's language","version":"3.0.0"}
 ---
 
 # YouTube Subtitles → Summary
@@ -137,7 +137,9 @@ the same either way; only the dispatch mechanism differs.
 - Each summarizer gets: the batch's rows from `manifest.tsv` (`NN \t videoId \t
   duration \t title` — four columns, no word count), the path to `text/`, the
   instruction to read each file **in full**, the exact output path and template,
-  and an explicit prohibition on inventing numbers not present in the transcript.
+  **the target language spelled out explicitly** (a subagent does not see the
+  user's request and will otherwise default to the transcript's language), and an
+  explicit prohibition on inventing numbers not present in the transcript.
   If you want word counts in the brief, join them in yourself from
   `vtt2txt.py --stats`; `manifest.tsv` does not carry that column.
 
@@ -154,7 +156,9 @@ output. The per-batch file boundary is what keeps quality from decaying.
 **Path C — scripting a non-agent LLM:** skip the agent entirely. Read
 `text/*.txt`, and for each file call your model with the template from "Per-video
 summary template" as the system prompt and the transcript as the user message.
-Batch by 10–12 for cost, not for context reasons.
+Put the target language in that system prompt too — it is the one thing the model
+cannot infer from a transcript in another language. Batch by 10–12 for cost, not
+for context reasons.
 
 Whatever the path, verify the batch count matches the manifest before assembling
 the index — a silently dropped batch is the most common failure at this step.
@@ -181,14 +185,37 @@ One summary per video, filename `NN_<videoId>.md`, is deliberate: each file is
 independently quotable and linkable, and its header carries enough metadata to
 decide whether the talk is worth reading.
 
+### Language: write the summary in the user's language
+
+The summary language is **the language the user is talking to you in**, not a
+fixed one, and not necessarily the language of the video. Ask if it is genuinely
+ambiguous (the user writes in English but the videos are Chinese, or a
+multilingual playlist); otherwise infer it from the request and go.
+
+Do not translate the transcript first and summarize the translation. Read the
+original transcript and write the summary directly in the target language — one
+pass, not two. A translation step in the middle costs tokens and drifts.
+
+Keep technical terms, version numbers, and product names in their original form
+regardless of summary language; do not translate `io_uring`, `Karpenter`,
+`containerd`, or `eBPF`.
+
+If the user wants several languages, write one summary file per language and
+suffix it: `NN_<videoId>.<lang>.md`.
+
 ### Per-video summary template
 
-```markdown
-# <Series> 演讲 #3：<中文标题>
+The template below is shown in Chinese because that is the most common case, but
+every field is language-neutral — substitute the user's language, and note the
+header says 原标题 / `<lang>`, not 英文标题 / `en`: the source video may not be
+English. Filename stays `NN_<videoId>.md`; only the prose changes.
 
-> 英文标题：<English title> by <speaker>（15min，约 2283 词）
+```markdown
+# <Series> 演讲 #3：<标题，用目标语言>
+
+> 原标题：<original title> by <speaker>（15min，约 2283 词）
 > 演讲者：<speaker>, <org>
-> 原始字幕：[text/<videoId>.en.txt](text/<videoId>.en.txt)
+> 原始字幕：[text/<videoId>.<lang>.txt](text/<videoId>.<lang>.txt)
 
 ---
 
@@ -196,12 +223,13 @@ decide whether the talk is worth reading.
 
 ---
 
-*摘要由字幕全文分析生成，完整转录见 `text/<videoId>.en.txt`。*
+*摘要由字幕全文分析生成，完整转录见 `text/<videoId>.<lang>.txt`。*
 ```
 
-Target 200–350 Chinese characters of body. Keep technical terms, version
-numbers, and product names in their original form; do not translate `io_uring`,
-`Karpenter`, `containerd`, or `eBPF`.
+Target 200–350 characters of body for Chinese and Japanese; for languages
+written in words rather than characters, target roughly 120–200 words, which
+carries about the same information. The point is one tight paragraph, not a
+character quota for its own sake.
 
 ## Verification
 

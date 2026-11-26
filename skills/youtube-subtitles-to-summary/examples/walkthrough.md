@@ -96,7 +96,7 @@ which is the whole danger.
 ```markdown
 # KubeCon NA 演讲 #3：超大规模集群的瓶颈如何修回上游——从 watch cache 到 containerd
 
-> 英文标题：Engineering Kubernetes for the Next Era of Workloads by Mike Stefaniak, AWS（4min，约 757 词）
+> 原标题：Engineering Kubernetes for the Next Era of Workloads by Mike Stefaniak, AWS（4min，约 757 词）
 > 演讲者：Mike Stefaniak, AWS
 > 原始字幕：[text/PjZ4kpLChpE.en-orig.txt](text/PjZ4kpLChpE.en-orig.txt)
 
@@ -112,9 +112,9 @@ which is the whole danger.
 Properties worth copying:
 
 - header carries duration and word count, so a reader can judge whether to read
-- one paragraph, three bold labels (this one is condensed to 160 Chinese
-  characters for readability; the shipped summary is 259, inside the 200–350 band
-  SKILL.md asks for)
+- one paragraph, three bold labels (this one is condensed to 160 characters for
+  readability; the shipped summary is 259, inside the 200–350 band SKILL.md asks
+  for)
 - technical terms untranslated (`watch cache`, `selector store`, `scheduler`)
 - every number traceable to the transcript (`5,000`, `100,000`, `0.5`, `2ms`, `4x`, `300+`)
 - link points at a file that exists

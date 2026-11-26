@@ -3,7 +3,9 @@
 [![skills.sh](https://skills.sh/b/LiuQhahah/youtube-subtitles-to-summary)](https://skills.sh/LiuQhahah/youtube-subtitles-to-summary)
 
 An agent skill that turns a YouTube video or an entire playlist into clean
-transcripts plus one summary file per talk — without watching anything.
+transcripts plus one summary file per talk — without watching anything. The
+summary is written in **your** language, not the video's, so an English talk
+yields Chinese notes if that is what you asked for, and vice versa.
 
 It is a plain [Agent Skills](https://skills.sh) package: `SKILL.md` plus
 stdlib-only Python scripts, no platform-specific API. The `skills` CLI installs
@@ -193,7 +195,7 @@ Built on the KubeCon NA keynote playlist (35 talks, 4.5 hours, 39,167 words):
 |---|---|
 | Subtitles downloaded | 35/35 (unpaced: 15/35) |
 | Words recovered vs token-extraction parser | +21.5% on a sampled talk (757 vs 623, `en-orig` track) |
-| Per-video summaries | 35/35, median 322 Chinese characters across the whole file (273 in the body paragraph that SKILL.md constrains) |
+| Per-video summaries | 35/35, median 322 characters across the whole file (273 in the body paragraph that SKILL.md constrains); this archive was written in Chinese |
 | Broken transcript links | 0 |
 
 The recovery figure is a *rate relative to the lossy parser*, not a share of the

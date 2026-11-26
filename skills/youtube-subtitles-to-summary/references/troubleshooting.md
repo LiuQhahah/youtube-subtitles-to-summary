@@ -147,7 +147,7 @@ python3 scripts/vtt2txt.py --stats vtt/*.vtt
 | Numbers not in the transcript | subagent hallucinated | instruct subagents to use only transcript values; spot-check every number |
 | Speaker names garbled | ASR mishearing (`Kube Sarnotzer` → `Kubestronaut`) | cross-check against video description; fix obvious ASR errors |
 | Titles truncated with `...` | YouTube truncates the display title | read the description's first line, which carries the full title |
-| Summary longer than the transcript | over-generation | cap body at 200–350 Chinese characters |
+| Summary longer than the transcript | over-generation | cap body at 200–350 characters (Chinese/Japanese) or ~120–200 words |
 | Some videos have no summary | batch silently dropped rows | verify `ls summaries/ | wc -l` equals manifest line count |
 
 **On ASR errors:** auto-captions mangle proper nouns constantly. Cross-check
