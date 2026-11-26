@@ -184,6 +184,7 @@ template and quality bar are in [`SKILL.md`](skills/youtube-subtitles-to-summary
 | [`references/vtt-formats.md`](skills/youtube-subtitles-to-summary/references/vtt-formats.md) | Rolling vs plain VTT; the measured 623 vs 757 word result and why the loss is systematic |
 | [`references/troubleshooting.md`](skills/youtube-subtitles-to-summary/references/troubleshooting.md) | Symptom → cause → fix |
 | [`examples/walkthrough.md`](skills/youtube-subtitles-to-summary/examples/walkthrough.md) | One video end to end, including a bad-summary counterexample |
+| [`LICENSE`](LICENSE) | MIT, at the repo root so GitHub and directory tools detect it; the skill folder keeps its own copy so the license travels with an install |
 
 ---
 
