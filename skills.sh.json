@@ -1,0 +1,13 @@
+{
+  "$schema": "https://skills.sh/schemas/skills.sh.schema.json",
+  "notGrouped": "bottom",
+  "groupings": [
+    {
+      "title": "Transcripts and summaries",
+      "description": "Turn a YouTube video or a whole playlist into clean transcripts plus one summary file per talk.",
+      "skills": [
+        "youtube-subtitles-to-summary"
+      ]
+    }
+  ]
+}

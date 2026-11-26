@@ -1,5 +1,7 @@
 # youtube-subtitles-to-summary
 
+[![skills.sh](https://skills.sh/b/LiuQhahah/youtube-subtitles-to-summary)](https://skills.sh/LiuQhahah/youtube-subtitles-to-summary)
+
 An agent skill that turns a YouTube video or an entire playlist into clean
 transcripts plus one summary file per talk — without watching anything.
 
@@ -94,6 +96,18 @@ can decide in two seconds whether the talk is worth reading.
 
 The PO token requirement is the one people miss. Full setup in
 [`references/pitfalls.md`](skills/youtube-subtitles-to-summary/references/pitfalls.md) §2.
+
+**On that last row, in plain terms.** The POT server is not something this
+repository ships or maintains. It is [`Brainicism/bgutil-ytdlp-pot-provider`](https://github.com/Brainicism/bgutil-ytdlp-pot-provider),
+an independent community project that you clone, build, and run locally. It is
+the de facto standard for this and widely used, but it is third-party code
+running on your machine with a listening port — review it yourself before
+trusting it, the same way you would any dependency. If you would rather not run
+it, the skill still works for videos whose captions download without a PO token;
+you will just hit HTTP 403 on the ones that require one.
+
+Nothing else here reaches the network except `yt-dlp` itself, fetching the
+video's caption track from YouTube.
 
 ---
 

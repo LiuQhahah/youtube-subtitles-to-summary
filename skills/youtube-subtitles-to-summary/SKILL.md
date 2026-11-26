@@ -66,9 +66,11 @@ curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:4416/
 **A `400` is healthy.** The server answers 400 with a hint body on a bare GET.
 `000` (connection refused) or `5xx` means it is down.
 
-`download_subs.py` runs this same probe itself and aborts early when the server
-is down. If you have already done the check above and want to skip the duplicate
-probe, pass `--skip-pot-check`; the flag exists only for that case.
+`download_subs.py` runs this same probe itself and prints a warning when the
+server is down — it does not abort, because manual-caption videos download fine
+without a PO token and only the auto-caption ones 403. If you have already done
+the check above and want to skip the duplicate probe, pass `--skip-pot-check`;
+the flag exists only for that case.
 
 ### 2. Enumerate the playlist
 
